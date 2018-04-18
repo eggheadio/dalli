@@ -140,10 +140,7 @@ module ActiveSupport
         name = namespaced_key(name, options)
 
         instrument_with_log(:write, name, options) do |payload|
-          with do |connection|
-            options = options.merge(:connection => connection)
-            write_entry(name, value, options)
-          end
+          write_entry(name, value, options)
         end
       end
 
@@ -316,7 +313,11 @@ module ActiveSupport
         method = options[:unless_exist] ? :add : :set
         expires_in = options[:expires_in]
         connection = options.delete(:connection)
-        connection.send(method, key, value, expires_in, options)
+        if connection
+          connection.send(method, key, value, expires_in, options)
+        else
+          with { |connection| connection.send(method, key, value, expires_in, options) }
+        end
       rescue Dalli::DalliError => e
         log_dalli_error(e)
         instrument_error(e) if instrument_errors?
